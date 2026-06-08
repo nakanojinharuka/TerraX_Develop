@@ -1,0 +1,16 @@
+# Claude Code / 会话本地文件
+.claude/settings.local.json
+.remember/
+
+# 参考文献 —— 受版权保护的 PDF，默认不纳入版本库。
+# 若本仓库为私有且你希望一并追踪，删除下面这一行即可。
+20260602_Papers/
+
+# Python
+__pycache__/
+*.pyc
+
+# 操作系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.tmp
