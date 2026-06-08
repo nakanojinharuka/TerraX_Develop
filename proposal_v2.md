@@ -52,7 +52,138 @@
 <!-- 待 Task 6b 填充（依赖文献精读 Task 6a） -->
 
 ## 四、研究内容与技术路线
-<!-- 待 Task 3a/3b/3c 填充 -->
+
+### 4.1 总体设计
+
+本研究将语义约束驱动的流程规划方法落实为四个功能层（L1–L4）。需要说明的是，这一模块划分与第 1.5 节提出的数据流水线"自然语言任务→空间语义约束→工作流图→工具流"是两条正交的视角：前者刻画"哪个模块承担哪项职责"，后者刻画"任务在每一步以何种形态被表示"；后者作为规划的内部处理流程，嵌入在 L2 任务规划层之中。各层职责及其对应的研究问题如下表所示。
+
+| 层级 | 功能 | 对应问题 |
+| --- | --- | --- |
+| **L1 规划知识层** | 构建工具与任务模式的知识库，存储工具功能特征、参数类型与数据依赖 | **RQ1**（知识） |
+| **L2 任务规划层** | 先将用户自然语言需求解析为空间语义约束，再据此生成基于有向无环图的结构化执行计划 | **RQ2**（规划） |
+| **L3 执行代理层** | 按结构化规划调用具体平台工具，捕获执行结果与错误信息 | **RQ3**（验证） |
+| **L4 规划迭代优化层** | 据结构化表示定位规划缺陷，生成修正指令并触发重规划 | **RQ3**（验证） |
+
+随后各节自底向上展开：L1 提供规划所依赖的知识（4.2）；L2 完成从自然语言到可验证结构的两步建模（4.3）；L3 执行并捕获错误（4.4）；L4 凭借结构化表示定位并修正规划缺陷（4.5）。
+
+### 4.2 L1 规划知识层——面向任务规划的地理空间知识表示
+
+现有 GeoCode-Base 等知识库主要服务于代码生成或工具调用阶段的知识检索，缺少专门服务于**任务规划**的知识结构。规划阶段的核心要求并非具体的工具实现或代码语法（如某函数的参数类型与取值约束），而是任务的**逻辑分解范式**（如选址问题是"缓冲区—相交—联合—擦除"的标准操作链）。据此，本研究将规划知识分为两个层次：
+
+1. **任务模式层**：从已有问题中提取**标准解决范式**——例如设施选址对应 Buffer / Intersect / Union / Erase，可达性分析对应 Buffer / Intersect / Summary Statistics——通过专家标注或大模型辅助归纳构建初始模式库，作为规划的高层指导。
+2. **工具能力描述层**：将每个工具抽象为"输入类型→操作类型→输出类型"的函数签名（如 Buffer：`(几何类型|点/线/面, 距离数值) → (几何类型|面)`）。该签名不绑定具体平台，而是通过"抽象原语（如 `buffer`）→平台实现（PyQGIS 的 `native:buffer` / ArcPy 的 `Buffer_analysis`）"的映射关系实现平台无关性，作为规划的原子单元。
+
+存储上采用图数据库（如 Neo4j）或 JSON/YAML 文本：**任务模式节点**指导高层分解，**工具能力节点**支撑泛化——当任务模式无法完全匹配时，规划层可通过检索工具能力库，构建与目标任务逻辑等价、但工具组合不同的替代方案。
+
+### 4.3 L2 任务规划层——空间语义约束→DAG 的两步建模（核心）
+
+当前 GeoAgent 等框架的规划输出仅为 Markdown 文档，子任务间的依赖关系（数据依赖、顺序约束）未被显式表达，导致执行阶段出现顺序混乱或数据丢失。本研究不让大模型从自然语言一步跳到工具序列，而是经"先约束、后成图"两步完成建模：第一步将需求解析为**空间语义约束表示**，第二步据该表示生成 **DAG**。两步之间是"是什么/要什么"到"怎么连/怎么算"的递进。
+
+#### 4.3.1 第一步：自然语言→空间语义约束表示
+
+这是本方法相对既有工作的关键增设。如第 1.4 节所述，若缺少结构化的语义约束，大模型只能基于表层语言匹配生成步骤；而该表示正是"可被机器映射的结构"的载体——它显式建模分析目标、空间对象、空间关系、正/负约束、属性条件、输出要求，以及隐含语义的操作化定义，共七类要素。以任务"在福田区内，筛选距学校 500 米以内、距工厂 1000 米以外、且位于商业用地的区域"为例：
+
+```json
+{
+  "task_id": "TASK_015",
+  "analysis_goal": "facility_siting",
+  "spatial_objects": [
+    {"role": "study_area",    "type": "Polygon", "source": "futian.gpkg:district_boundary"},
+    {"role": "near_features", "type": "Point",   "source": "futian.gpkg:schools"},
+    {"role": "avoid_features","type": "Point",   "source": "futian.gpkg:factories"},
+    {"role": "landuse_layer", "type": "Polygon", "source": "futian.gpkg:landuse"}
+  ],
+  "spatial_relations": ["proximity", "containment"],
+  "positive_constraints": [
+    {"object": "near_features", "relation": "within_distance", "value": 500, "unit": "m"}
+  ],
+  "negative_constraints": [
+    {"object": "avoid_features", "relation": "beyond_distance", "value": 1000, "unit": "m"}
+  ],
+  "attribute_conditions": [
+    {"layer": "landuse_layer", "field": "landuse_type", "op": "in", "value": ["商业用地", "商住混合用地"]}
+  ],
+  "output_requirement": {"type": "Polygon", "semantics": "candidate_regions"},
+  "implicit_operationalization": [
+    "若需求含‘交通便利’等隐含语义，操作化为 距路网<阈值 的缓冲区相交"
+  ]
+}
+```
+
+#### 4.3.2 第二步：空间语义约束→DAG
+
+以有向无环图为核心数据结构：**节点**为子任务（字段含 `task_id`、`description`、`tool_primitive`、`input_schema`、`output_schema`、`parameters`），**有向边**为子任务间的数据流依赖与流向，并附**全局约束**。承接 4.3.1 的语义约束，可逐项映射为图元素：正约束（近学校）→ 学校缓冲区节点 T1；负约束（远工厂）→ 工厂缓冲区 T2 与擦除 T4；属性条件 → 筛选节点 T5；研究区域 → 相交节点 T3。由此得到该任务的 DAG：
+
+```json
+{
+  "plan_id": "plan_TASK_015",
+  "nodes": [
+    {"task_id": "T1", "tool_primitive": "buffer", "description": "对学校创建500米缓冲区",
+     "input_schema": {"source": "futian.gpkg:schools", "geometry": "Point"},
+     "output_schema": {"type": "GeoDataFrame", "geometry": "Polygon", "crs": "EPSG:3857"},
+     "parameters": {"distance": 500, "unit": "m"}},
+    {"task_id": "T2", "tool_primitive": "buffer", "description": "对工厂创建1000米缓冲区",
+     "input_schema": {"source": "futian.gpkg:factories", "geometry": "Point"},
+     "output_schema": {"type": "GeoDataFrame", "geometry": "Polygon", "crs": "EPSG:3857"},
+     "parameters": {"distance": 1000, "unit": "m"}},
+    {"task_id": "T3", "tool_primitive": "intersect", "description": "学校缓冲区与研究区域相交",
+     "input_schema": [{"ref": "T1.output"}, {"source": "futian.gpkg:district_boundary"}],
+     "output_schema": {"type": "GeoDataFrame", "geometry": "Polygon"}},
+    {"task_id": "T4", "tool_primitive": "erase", "description": "从候选区擦除工厂缓冲区",
+     "input_schema": [{"ref": "T3.output"}, {"ref": "T2.output"}],
+     "output_schema": {"type": "GeoDataFrame", "geometry": "Polygon"}},
+    {"task_id": "T5", "tool_primitive": "attribute_filter", "description": "按用地类型筛选商业用地",
+     "input_schema": {"ref": "T4.output"},
+     "output_schema": {"type": "GeoDataFrame", "geometry": "Polygon"},
+     "parameters": {"field": "landuse_type", "op": "in", "value": ["商业用地", "商住混合用地"]}}
+  ],
+  "edges": [
+    {"from": "T1", "to": "T3", "data_flow": "school_buffer -> intersect_input"},
+    {"from": "T2", "to": "T4", "data_flow": "factory_buffer -> erase_input"},
+    {"from": "T3", "to": "T4", "data_flow": "near_candidate -> erase_target"},
+    {"from": "T4", "to": "T5", "data_flow": "candidate -> filter_input"}
+  ],
+  "global_constraints": [
+    "所有空间操作前统一坐标系为 EPSG:3857",
+    "缓冲区距离单位为米"
+  ]
+}
+```
+
+生成方式采用**两阶段约束生成**策略，以提示词为主：**第一阶段（粗粒度）**让大模型据 L1 知识库将需求分解为子任务序列（如"①加载数据→②建缓冲区→③相交→④擦除→⑤筛选"）；**第二阶段（细粒度）**为每个子任务声明输入输出类型、识别跨子任务的数据依赖并构建图。第二阶段的提示中嵌入若干硬性约束，如"所有输入必须有至少一个对应的上游节点提供""DAG 不可存在循环依赖"。
+
+#### 4.3.3 DAG 验证器
+
+基于 `networkx` 编写验证器，对生成的图自动检查三项：**无环性**（拓扑可排序）、**输入输出类型匹配**（相邻节点的 `output_schema` 与 `input_schema` 相容）、**约束满足性**（全局约束被遵守）。验证不通过的图将携带具体的失败位置进入 L4，而非笼统报错——这为后续的错误回溯（4.5）奠定了基础。
+
+### 4.4 L3 执行代理层——执行跟踪与错误捕获
+
+执行代理层按 DAG 的拓扑顺序调用具体平台工具，并在执行每个子任务时记录三类状态，作为 L4 诊断的输入：
+
+1. **任务异常信息**：以结构化的异常类型记录，如工具不存在 `ToolNotFoundError`、参数类型不匹配 `TypeError`、输入缺失 `InputError`、依赖顺序错误 `SequenceError`；
+2. **任务状态**：仅区分成功与失败两态，便于定位首个失败节点；
+3. **关键数据状态**：如输出数据的要素数量、几何类型、坐标参考系等，用于判断"虽未报错但结果异常"（如输出为空）的情形。
+
+这三类状态共同构成执行日志。与仅返回一句报错文本不同，结构化的执行日志使"错误现象"能够与 DAG 的具体节点和边对应起来，从而支撑下一层的精准回溯。
+
+### 4.5 L4 规划迭代优化层——基于结构化表示的错误回溯与定向修正
+
+这一层是本方法对"事后修补"范式的关键改造。如第 1.4 节所指出的，既有系统即便引入审查机制（Reviewer）对执行错误进行后验修补，也难以将错误准确映射回规划层的某个步骤或某条依赖——根本原因在于其规划结果是面向人类的文档，缺少可被机器对位的结构。而在本方法中，L2 已产出空间语义约束与 DAG 这一**可映射的结构**，L3 又给出了**可对位的结构化日志**；二者相遇，"执行错误→规划层缺陷"的回溯才第一次成为可计算的操作。为此设计独立的**规划审核代理（Plan Auditor）**，其工作流程分三步：
+
+1. **诊断**：审核代理接收执行日志与原始规划 DAG，依据预设的诊断规则库判断失败根源是否在规划层。例如，"参数类型不匹配"对应 L2 阶段工具抽象原语与实际平台实现的不匹配；"缺失上游数据"对应 L2 阶段依赖关系提取不完整。
+2. **定位**：在原始 DAG 中标识出具体的问题节点或边，而非泛泛归因。
+3. **修正**：生成结构化的修正指令 JSON，触发规划层重新生成修改后的 DAG，替代原规划继续执行。例如，当诊断出 T1 与 T3 之间存在坐标系不一致时：
+
+```json
+{
+  "diagnosis": "CRS mismatch: T1 output (EPSG:4326) vs T3 requirement (EPSG:3857)",
+  "fault_location": "edge between T1 and T3",
+  "suggested_fix": "Insert a 'reproject' task before T3, setting target_crs=EPSG:3857",
+  "new_plan_constraints": ["All layers must be in EPSG:3857 before spatial operations"]
+}
+```
+
+此外，系统将每次修正成功的"规划缺陷→修正方案"案例对存入专门的知识库，作为未来规划的 few-shot 示例。该积累机制旨在逐步降低修正所需的 token 消耗与延迟，使系统在运行中持续优化。
 
 ## 五、实验设计与验证
 <!-- 待 Task 4a/4b/4c 填充 -->
