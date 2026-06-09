@@ -4,7 +4,18 @@
 
 # 参考文献 —— 受版权保护的 PDF，默认不纳入版本库。
 # 若本仓库为私有且你希望一并追踪，删除下面这一行即可。
-20260602_Papers/
+*_Papers/
+
+# 凭据与密钥 - 绝不纳入版本库（防止 Token / 密码 / 密钥泄露）
+.env
+.env.*
+.git-credentials
+*.pem
+*.key
+*.pat
+*.token
+secrets.*
+credentials.*
 
 # Python
 __pycache__/
