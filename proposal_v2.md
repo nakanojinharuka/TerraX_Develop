@@ -60,9 +60,9 @@
 
 大语言模型在自然语言理解、推理与代码生成上的能力，把 GeoAI 的关注点从"单任务建模"推向"流程自动化"。这一阶段的工作大体沿三条线展开：
 
-- **代码生成**：将自然语言需求翻译为可执行的地理空间代码。GeoCode-GPT 构建了首个面向地理空间代码生成的专用模型与语料，针对"代码拒绝"与"代码幻觉"问题（Hou et al., 2025）；Chain-of-Programming 把代码生成拆为需求分析、算法设计、实现、调试、注释五步，以提升逻辑性与可执行性（Hou et al., 2025）。
+- **代码生成**：将自然语言需求翻译为可执行的地理空间代码。GeoCode-GPT 构建了首个面向地理空间代码生成的专用模型与语料，针对"代码拒绝"与"代码幻觉"问题（Hou et al., 2025a）；Chain-of-Programming 把代码生成拆为需求分析、算法设计、实现、调试、注释五步，以提升逻辑性与可执行性（Hou et al., 2025b）。
 - **工具使用**：让模型学会调用专业 GIS 工具。GeoTool-GPT 用 GIS 指令数据微调模型以生成工具调用序列（Wei et al., 2025）；GeoGPT 以 LangChain 连接 LLM 与预定义工具池，解释需求、规划步骤并顺序执行（Zhang et al., 2024）。
-- **知识增强**：用外部知识弥补通用模型的领域空白。GEE-OPs 从近三十万条 GEE 脚本中抽取算子语法、关系、频繁模式与关系链知识库，显著提升代码可执行性（Hou et al., 2025）；GeoGraphRAG 以图结构检索增强生成（Liang et al., 2025）。
+- **知识增强**：用外部知识弥补通用模型的领域空白。GEE-OPs 从近三十万条 GEE 脚本中抽取算子语法、关系、频繁模式与关系链知识库，显著提升代码可执行性（Hou et al., 2025c）；GeoGraphRAG 以图结构检索增强生成（Liang et al., 2025）。
 
 值得注意的是，这些工作的知识与流程**主要服务于代码生成或工具调用**——知识库描述的是函数语法与算子关系，流程产物是代码或工具序列；它们尚未把"任务应如何被结构化地规划"本身作为对象。这为后文规划层的讨论埋下伏笔。
 
@@ -468,4 +468,28 @@ Li & Ning（2023）提出"自主 GIS（Autonomous GIS）"，以 LLM 为决策核
 - **实验层面**：与原版及多个基线的对比与消融结果，量化"语义约束层""DAG 结构化""错误回溯"各自的贡献。
 
 ## 参考文献
-<!-- 待 Task 7 汇总 -->
+
+> 注：以下条目依据精读 PDF 整理，按作者字母排序；最终格式与完整著录建议用 Zotero 库（`20260609_Papers.rdf`）按学校规范自动生成。
+
+1. Akinboyewa, T., Li, Z., Ning, H., & Lessani, M. N. (2025). GIS Copilot: towards an autonomous GIS agent for spatial analysis. *International Journal of Digital Earth*, 18(1), 2497489.
+2. Hou, S., et al. (2025a). GeoCode-GPT: A large language model for geospatial code generation.
+3. Hou, S., et al. (2025b). Chain-of-Programming (CoP): empowering large language models for geospatial code generation task.
+4. Hou, S., Liang, J., Zhao, A., & Wu, H. (2025c). GEE-OPs: An operator knowledge base for geospatial code generation on the Google Earth Engine platform powered by large language models.
+5. Hou, S., et al. (2026). GeoCogent: an LLM-based agent for geospatial code generation.
+6. Krechetova, M., & Kochedykov, D. (2025). GeoBenchX: Benchmarking LLMs in Agent Solving Multistep Geospatial Tasks.
+7. Li, Z., & Ning, H. (2023). Autonomous GIS: the next-generation AI-powered GIS. *International Journal of Digital Earth*, 16(2), 4668–4686.
+8. Li, J., et al. (2026). MiniGeoSolver: Enhancing small language models for autonomous geospatial tool sequences generation.
+9. Liang, ... (2025). GeoGraphRAG: A graph-based retrieval-augmented generation approach for empowering large language models in geospatial code generation.
+10. Liang, ... (2026). GeoAgentic-RAG: A multi-agent framework for autonomous geospatial reasoning and visual insight generation.
+11. Lin, Q., Hu, R., Li, H., Wu, S., et al. (2025). ShapefileGPT: a multi-agent large language model framework for automated shapefile processing. *International Journal of Digital Earth*, 18(2), 2577884.
+12. Lin, Q., Xu, L., Wu, S., Mao, R., Wang, C., Feng, H., Huang, B., & Du, Z. (2026). GeoAgent: a hierarchical LLM-based multi-agent architecture for autonomous spatial analysis. *International Journal of Geographical Information Science*. DOI: 10.1080/13658816.2026.2624784.
+13. Luo, Q., Lin, Q., Xu, L., Wu, S., et al. (2026). GeoJSON agents: a multi-agent LLM architecture for geospatial analysis—function calling vs. code generation. *Big Earth Data*. DOI: 10.1080/20964471.2026.2615511.
+14. Mansourian, A., & Oucheikh, R. (2026). Bridging natural language and GIS: a multi-agent framework for LLM-driven autonomous geospatial analysis. *International Journal of Digital Earth*, 19(1), 2633849.
+15. Shabbir, ... (2026). OpenEarthAgent: A Unified Framework for Tool-Augmented Geospatial Agents.
+16. Wei, C., Zhang, Y., Zhao, X., Zeng, Z., et al. (2025). GeoTool-GPT: a trainable method for facilitating Large Language Models to master GIS tools.
+17. Wu, H., Jiao, H., Hou, S., Liang, J., et al. (2025). GeoColab: an LLM-based multi-agent collaborative framework for geospatial code generation. *International Journal of Digital Earth*, 18(2), 2569405.
+18. Wu, ... (2025). AutoGEEval++: A multi-level and multi-geospatial-modality automated evaluation framework for large language models.
+19. Xiao, Y., Xiao, R., & Zhang, Y. (2026). GeoContra: From Fluent GIS Code to Verifiable Spatial Analysis with Geography-Grounded Repair. *arXiv:2605.00782*.
+20. Yu, ... (2026). GeoAgentBench: A Dynamic Execution Benchmark for Tool-Augmented Agents in Spatial Analysis.
+21. Zhang, ... (2024). GeoGPT: An assistant for understanding and processing geospatial tasks. *International Journal of Applied Earth Observation and Geoinformation*, 131, 103976.
+22. Zhang, Q., Gao, S., Wei, C., Zhao, Y., Nie, Y., et al. (2025). GeoAnalystBench: A GeoAI Benchmark for Assessing Large Language Models for Spatial Analysis Workflow and Code Generation. *Transactions in GIS*, 29, e70135.
